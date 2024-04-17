@@ -4,11 +4,16 @@ import os
 from multiprocessing.pool import ThreadPool
 from collections import defaultdict
 
-from postgres_test.current_approach.enums.ProductType import ProductType
-from postgres_test.current_approach.utils import FnoCSV
-from postgres_test.new_approach.models import Candle
+from current_approach.enums.ProductType import ProductType
+from current_approach.enums.TimeFrame import EncodingType
+from current_approach.utils import FnoCSV
+from new_approach.models import CandleBytes
+import zlib
+import msgpack
 import decimal
+import base64
 
+enc_type = EncodingType.MsgPack
 # class CandleToEncode:
 #     def __init__(self, time, open_price, high, low, close, volume, oi):
 #         self.time = time
@@ -43,17 +48,28 @@ import decimal
 #         )
 
 class CandlesListToEncode:
-    def __init__(self, candles: list(FnoCSV) = None):
-        self.candles = candles
+    def __init__(self):
+        self.candles = []
 
-    def encode(self):
-        return json.dumps([candle.to_dict() for candle in self.candles])
+    def encode(self, encodingMethod :EncodingType):
+        if encodingMethod == EncodingType.JSON:
+            return json.dumps([candle.to_dict() for candle in self.candles])
+        if encodingMethod == EncodingType.ZLib:
+            return zlib_compress_and_encode(json.dumps([candle.to_dict() for candle in self.candles]).encode('utf-8'))
+        if encodingMethod == EncodingType.MsgPack:
+            return msgpack_serialize_and_encode([candle.to_dict() for candle in self.candles])
+
+
 
     @classmethod
-    def decode(cls, data):
-        instance = cls()
-        instance.candles = [Candle.from_dict(candle_data) for candle_data in json.loads(data)]
-        return instance
+    def decode(self,data, encodingMethod :EncodingType):
+        if encodingMethod == EncodingType.JSON:
+            self.candles = [FnoCSV.from_dict(candle_data) for candle_data in json.loads(data)]
+        if encodingMethod == EncodingType.ZLib:
+            self.candles = [FnoCSV.from_dict(candle_data) for candle_data in json.loads(zlib_decode_and_decompress(data).decode('utf-8'))]
+        if encodingMethod == EncodingType.MsgPack:
+            self.candles = [FnoCSV.from_dict(candle_data) for candle_data in msgpack_decode_and_deserialize(data)]
+
 
     def order_by_time(self):
         self.candles.sort(key=lambda x: x.time)
@@ -62,7 +78,7 @@ class CandlesListToEncode:
         self.candles.append(candle)
         self.order_by_time()
 
-def divide_by_scrip_and_date(fno_csv_list: list(FnoCSV)):
+def divide_by_scrip_and_date(fno_csv_list: list[FnoCSV]):
     divided_data = defaultdict(list)
     for fno_obj in fno_csv_list:
         key = (fno_obj.scrip_name, fno_obj.date)
@@ -89,7 +105,7 @@ def candle_exists_in_db(candle, scrip_date_time_map):
     # Check if the scrip_name and date exist in the map
     if (candle.scrip_name, candle.date) in scrip_date_time_map:
         # Check if the candle's time exists in the inner map
-        if candle.time.strftime('%H:%M:%S') in scrip_date_time_map[(candle.scrip_name, candle.date)]:
+        if candle.time in scrip_date_time_map[(candle.scrip_name, candle.date)]:
             return True
     return False
 
@@ -135,14 +151,19 @@ def insert_fno_data_into_db(candles, scrip_date_time_map, candle_bulk_create, ti
         if not candle_exists_in_db(cand, scrip_date_time_map):
             to_add.append(cand)
     if len(to_add) > 0:
-        existing_cand = Candle.objects.filter(scrip_name=scrip_name, date=date, time_frame=time_frame.name)
-        data = CandlesListToEncode.decode(existing_cand.candles_data)
+        existing_cand = CandleBytes.objects.filter(scrip_name=scrip_name, date=date, time_frame=time_frame.name,
+                                            encoding_type=enc_type)
+        data = CandlesListToEncode()
+        if existing_cand:
+            enum_type, enum_value = existing_cand.encoding_type.split('.')
+            enum_type = getattr(EncodingType, enum_type)
+            data.decode(existing_cand.candles_data, encodingMethod=enum_type)
         for cand in to_add:
             data.add_candle(cand)
-
-        candle_bulk_create.add(Candle(
+        enc_data=data.encode(encodingMethod=enc_type)
+        candle_bulk_create.add(CandleBytes(
             scrip_name=scrip_name, date=date, time_frame=time_frame.name, type=ProductType.NFO,
-            candle_data=data
+            candles_data=enc_data, encoding_type=enc_type
         ))
 
 
@@ -181,12 +202,17 @@ class CandlesInDb:
             self.scrip_date_time_map[(scrip_name, date)] = {}
 
         # Fetch candles from the database
-        for candle in Candle.objects.filter(scrip_name=scrip_name, date=date, time_frame=self.time_frame.name):
-            data = json.loads(candle.candles_data)
-            for time_data in data:
+        for candle in CandleBytes.objects.filter(scrip_name=scrip_name, date=date,
+                                            time_frame=self.time_frame.name,
+                                            encoding_type=enc_type):
+            data = CandlesListToEncode()
+            enum_type, enum_value = candle.encoding_type.split('.')
+            enum_type = getattr(EncodingType, enum_value)
+            data.decode(candle.candles_data, encodingMethod=enum_type)
+            for time_data in data.candles:
                 # time_key = candle.time.strftime('%H:%M:%S')
                 # Store the candle in the inner map
-                time_key = time_data["time_data"]
+                time_key = time_data.time
                 self.scrip_date_time_map[(scrip_name, date)][time_key] = True
 
     def fetch_scrip_and_create_map(self, candles):
@@ -219,3 +245,19 @@ class CandlesInDb:
     def get_results(self, candles):
         self.fetch_scrip_and_create_map(candles)
         return self.scrip_date_time_map
+
+def zlib_compress_and_encode(data):
+    compressed_data = zlib.compress((data))
+    return base64.b64encode(compressed_data)
+
+def zlib_decode_and_decompress(encoded_data):
+    compressed_data = base64.b64decode(encoded_data)
+    return zlib.decompress(compressed_data)
+
+def msgpack_serialize_and_encode(data):
+    serialized_data = msgpack.packb(data)
+    return base64.b64encode(serialized_data)
+
+def msgpack_decode_and_deserialize(encoded_data):
+    serialized_data = base64.b64decode(encoded_data)
+    return msgpack.unpackb(serialized_data)

@@ -61,3 +61,13 @@ class TimeFrame(Enum):
             return 1440
         raise Exception("Invalid Time frame values. Expected values {0}".format(
             [i[1] for i in TimeFrame.time_frame_key_value_tuple()]))
+
+class EncodingType(Enum):
+
+    JSON = "json"
+    ZLib = "zlib"
+    MsgPack = "msgpack"
+
+    @classmethod
+    def choices(cls):
+        return tuple((i.name, i.value) for i in cls)

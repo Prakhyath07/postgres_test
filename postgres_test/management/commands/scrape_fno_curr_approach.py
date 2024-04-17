@@ -4,8 +4,8 @@ import os
 
 from django.core.management.base import BaseCommand
 
-from postgres_test.current_approach.enums.TimeFrame import TimeFrame
-from postgres_test.current_approach.utils import parse_csv_list_and_insert_into_db
+from current_approach.enums.TimeFrame import TimeFrame
+from current_approach.utils import parse_csv_list_and_insert_into_db
 
 
 class Command(BaseCommand):
@@ -26,9 +26,9 @@ class Command(BaseCommand):
         self.scrip_name_exclude = kwargs['scrip_name_exclude']
         self.directory = kwargs['directory']
         self.stdout.write("Scraping FNO")
-        # csv_files = self.get_all_csv_files()
-        # parse_csv_list_and_insert_into_db(csv_files, self.time_frame, self.scrip_name.split(','), self.scrip_name_exclude.split(','))
-        # self.stdout.write("%s" % csv_files)
+        csv_files = self.get_all_csv_files()
+        parse_csv_list_and_insert_into_db(csv_files, self.time_frame, self.scrip_name.split(','), self.scrip_name_exclude.split(','))
+        self.stdout.write("%s" % csv_files)
 
     def get_all_csv_files(self):
         folders = [f.path for f in os.scandir(self.data_folder) if f.is_dir()]

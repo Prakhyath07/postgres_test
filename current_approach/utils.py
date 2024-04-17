@@ -4,8 +4,8 @@ import os
 from multiprocessing.pool import ThreadPool
 
 
-from postgres_test.current_approach.enums.ProductType import ProductType
-from postgres_test.current_approach.models import Candle
+from current_approach.enums.ProductType import ProductType
+from current_approach.models import Candle
 import decimal
 
 
@@ -65,25 +65,27 @@ class FnoCSV:
 
     def to_dict(self):
         return {
-            "time": self.time,
-            "open": self.open,
-            "high": self.high,
-            "low": self.low,
-            "close": self.close,
-            "volume": self.volume,
-            "oi": self.oi
+            "time": str(self.time),
+            "open": str(self.open),
+            "high": str(self.high),
+            "low": str(self.low),
+            "close": str(self.close),
+            "volume": str(self.volume),
+            "oi": str(self.oi)
         }
 
     @classmethod
     def from_dict(cls, data):
         return cls(
-            time=data["time"],
-            open_price=data["open"],
-            high=data["high"],
-            low=data["low"],
-            close=data["close"],
-            volume=data["volume"],
-            oi=data["oi"]
+            # data["scrip_name"],
+            # data["date"],
+            data["time"],
+            data["open"],
+            data["high"],
+            data["low"],
+            data["close"],
+            data["volume"],
+            data["oi"]
         )
     def __str__(self) -> str:
         return "FNO CSV - " + str(self.date) + " " + str(self.time)

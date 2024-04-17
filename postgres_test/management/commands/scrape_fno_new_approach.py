@@ -4,8 +4,8 @@ import os
 
 from django.core.management.base import BaseCommand
 
-from postgres_test.current_approach.enums.TimeFrame import TimeFrame
-from postgres_test.new_approach.utils import parse_csv_list_and_insert_into_db
+from current_approach.enums.TimeFrame import TimeFrame
+from new_approach.utils import parse_csv_list_and_insert_into_db
 
 
 class Command(BaseCommand):

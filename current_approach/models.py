@@ -1,8 +1,8 @@
 from django.db import models
 
 # from constants import time_format_with_seconds, date_format
-from postgres_test.current_approach.enums.ProductType import ProductType
-from postgres_test.current_approach.enums.TimeFrame import TimeFrame
+from current_approach.enums.ProductType import ProductType
+from current_approach.enums.TimeFrame import TimeFrame
 # import datetime as dt
 
 class Candle(models.Model):
