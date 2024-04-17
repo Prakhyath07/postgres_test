@@ -13,7 +13,7 @@ import msgpack
 import decimal
 import base64
 
-enc_type = EncodingType.MsgPack
+enc_type = EncodingType.ZLib
 # class CandleToEncode:
 #     def __init__(self, time, open_price, high, low, close, volume, oi):
 #         self.time = time
@@ -61,12 +61,12 @@ class CandlesListToEncode:
 
 
 
-    @classmethod
     def decode(self,data, encodingMethod :EncodingType):
         if encodingMethod == EncodingType.JSON:
             self.candles = [FnoCSV.from_dict(candle_data) for candle_data in json.loads(data)]
         if encodingMethod == EncodingType.ZLib:
-            self.candles = [FnoCSV.from_dict(candle_data) for candle_data in json.loads(zlib_decode_and_decompress(data).decode('utf-8'))]
+            c =[FnoCSV.from_dict(candle_data) for candle_data in json.loads(zlib_decode_and_decompress(data).decode('utf-8'))]
+            self.candles = c
         if encodingMethod == EncodingType.MsgPack:
             self.candles = [FnoCSV.from_dict(candle_data) for candle_data in msgpack_decode_and_deserialize(data)]
 

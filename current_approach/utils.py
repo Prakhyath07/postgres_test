@@ -76,16 +76,12 @@ class FnoCSV:
 
     @classmethod
     def from_dict(cls, data):
+        data["scrip_name"] = ""
+        data["date"] = "01-02-2006"
+        csv = [data["scrip_name"],data["date"],data["time"],data["open"] ,data["high"],data["low"],data["close"],\
+            data["volume"],data["oi"]]
         return cls(
-            # data["scrip_name"],
-            # data["date"],
-            data["time"],
-            data["open"],
-            data["high"],
-            data["low"],
-            data["close"],
-            data["volume"],
-            data["oi"]
+            csv
         )
     def __str__(self) -> str:
         return "FNO CSV - " + str(self.date) + " " + str(self.time)
